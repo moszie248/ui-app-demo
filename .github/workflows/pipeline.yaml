@@ -78,7 +78,7 @@ jobs:
           docker tag $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:${{ steps.variables.outputs.ref_tag }} $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:$TAG
           docker push $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:$TAG
 
-      trigger:
+  trigger:
     needs: build
     # if: ${{ ( github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/' || github.ref == 'refs/heads/main' ) )  }}
     name: Update Tag and Deploy
