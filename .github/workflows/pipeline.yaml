@@ -78,5 +78,45 @@ jobs:
           docker tag $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:${{ steps.variables.outputs.ref_tag }} $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:$TAG
           docker push $REGISTRY/kubernetes-workshop/${{ env.IMAGE_NAME }}:$TAG
 
-      # trigger:
+      trigger:
+    needs: build
+    # if: ${{ ( github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/' || github.ref == 'refs/heads/main' ) )  }}
+    name: Update Tag and Deploy
+    runs-on: ubuntu-24.04  # Uses GitHub-hosted runner
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Check out my other private repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.build.outputs.repo }}
+          token: ${{ secrets.AUTH_GIT }}
+          path: ${{ needs.build.outputs.path_repo }}
+          ref: main
+
+
+      - name: Update image from registry
+        working-directory: ${{ needs.build.outputs.path_repo }}
+        env:
+          IMAGE: ${{ needs.build.outputs.image_tag }}
+        run: |-
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+          for file in $(find ./helm-values -type f -name '*.yaml'); do
+            ENV=$(yq e '.ENV' $file)
+            if [ "$ENV" = "${{ needs.build.outputs.env }}" ]; then
+              yq e -i '.API.tag = strenv(IMAGE)' $file
+            fi
+          done
+      
+      - name: Update repository
+        working-directory: ${{ needs.build.outputs.path_repo }}
+        run: |-
+          git config --global user.email "support@dependabot.com"
+          git config --global user.name "dependabot[bot]"
+          git add .
+          git commit -am "release: ${{ env.IMAGE_NAME }} env: ${{ needs.build.outputs.env }} version: ${{ needs.build.outputs.image_tag }}"
+          git push origin main
       
